@@ -1,5 +1,7 @@
 package aptivine;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import java.util.List;
 
 import org.eclipse.swt.SWT;
@@ -21,9 +23,11 @@ import org.eclipse.swt.widgets.TableItem;
 import org.eclipse.swt.widgets.Text;
 
 import com.google.api.client.util.Strings;
+import com.google.inject.Inject;
 
 public class View {
 
+  private final PackageUtils packageUtils;
   private Controller controller;
   private Shell shell;
   private Display display;
@@ -37,7 +41,10 @@ public class View {
   private Label labelStatusBar;
   private Composite compositeTable;
 
-  public View() {
+  @Inject
+  public View(PackageUtils packageUtils) {
+    this.packageUtils = checkNotNull(packageUtils);
+
     display = new Display();
     shell = new Shell(display);
     shell.setText("Aptivine ver " + Constants.VERSION);
@@ -237,7 +244,8 @@ public class View {
       recreateTable();
 
       for (Package file : files) {
-        String[] strings = { "", file.getId(), "", file.getVersionAsString(), file.getFileSize() };
+        String[] strings = { "", file.getId(), "",
+            packageUtils.getVersionAsString(file.getFileName()), file.getFileSize() };
         TableItem tableItem = new TableItem(table, SWT.NONE);
         tableItem.setText(strings);
       }

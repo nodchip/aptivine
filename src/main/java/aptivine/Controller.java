@@ -1,5 +1,7 @@
 package aptivine;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -22,7 +24,6 @@ import com.google.api.client.http.HttpRequestFactory;
 import com.google.api.client.http.HttpResponse;
 import com.google.api.client.http.HttpTransport;
 import com.google.common.base.Charsets;
-import com.google.common.base.Preconditions;
 import com.google.inject.Inject;
 
 public class Controller {
@@ -36,13 +37,16 @@ public class Controller {
   private final HttpTransport httpTransport;
   private final View view;
   private final Database database;
+  private final PackageUtils packageUtils;
   private Map<String, Package> packages;
 
   @Inject
-  public Controller(HttpTransport httpTransport, View view, Database database) {
-    this.httpTransport = Preconditions.checkNotNull(httpTransport);
-    this.view = Preconditions.checkNotNull(view);
-    this.database = Preconditions.checkNotNull(database);
+  public Controller(HttpTransport httpTransport, View view, Database database,
+      PackageUtils packageUtils) {
+    this.httpTransport = checkNotNull(httpTransport);
+    this.view = checkNotNull(view);
+    this.database = checkNotNull(database);
+    this.packageUtils = checkNotNull(packageUtils);
   }
 
   public void start() {
@@ -62,9 +66,13 @@ public class Controller {
 
     Map<String, Package> uniqued = new TreeMap<>();
     for (Package file : packages) {
-      if (uniqued.containsKey(file.getId())
-          && uniqued.get(file.getId()).getVersionAsDouble() > file.getVersionAsDouble()) {
-        continue;
+      if (uniqued.containsKey(file.getId())) {
+        Package existingPackage = uniqued.get(file.getId());
+        double existingVersion = packageUtils.getVersionAsDouble(existingPackage.getFileName());
+        double newVersion = packageUtils.getVersionAsDouble(file.getFileName());
+        if (existingVersion > newVersion) {
+          continue;
+        }
       }
       uniqued.put(file.getId(), file);
     }
@@ -106,6 +114,7 @@ public class Controller {
         continue;
       }
       file.setUrl(matcher.group(1));
+      file.setId(packageUtils.getId(matcher.group(2)));
       file.setFileName(matcher.group(2));
       file.setFileSize(matcher.group(3));
       file.setComment(matcher.group(4));
