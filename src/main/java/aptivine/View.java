@@ -3,6 +3,7 @@ package aptivine;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import java.util.List;
+import java.util.Map;
 
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.SelectionAdapter;
@@ -239,13 +240,22 @@ public class View {
     });
   }
 
-  public void setUploadedFiles(List<Package> files) {
+  public void setUploadedFiles(List<Package> files, Map<String, Package> installedPackages) {
     checkAsyncExec(() -> {
       recreateTable();
 
       for (Package file : files) {
-        String[] strings = { "", file.getId(), "",
-            packageUtils.getVersionAsString(file.getFileName()), file.getFileSize() };
+        String id = file.getId();
+        String installedVersion;
+        if (installedPackages.containsKey(id)) {
+          installedVersion = packageUtils.getVersionAsString(installedPackages.get(id)
+              .getFileName());
+        } else {
+          installedVersion = "";
+        }
+        String latestVersion = packageUtils.getVersionAsString(file.getFileName());
+        String fileSize = file.getFileSize();
+        String[] strings = { "", id, installedVersion, latestVersion, fileSize };
         TableItem tableItem = new TableItem(table, SWT.NONE);
         tableItem.setText(strings);
       }

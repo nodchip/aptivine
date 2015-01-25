@@ -17,6 +17,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import aptivine.database.Database;
+import aptivine.database.DatabaseException;
 
 import com.google.api.client.http.GenericUrl;
 import com.google.api.client.http.HttpRequest;
@@ -78,7 +79,17 @@ public class Controller {
     }
     this.packages = uniqued;
 
-    view.setUploadedFiles(new ArrayList<>(uniqued.values()));
+    Map<String, Package> installedPackages;
+    try {
+      installedPackages = database.loadInstalledPackages();
+    } catch (DatabaseException e) {
+      logger.log(Level.WARNING, "インストール済みパッケージの読み込みに失敗しました", e);
+      view.setStatusBar("インストール済みパッケージの読み込みに失敗しました");
+      view.setEnabled(true);
+      return;
+    }
+
+    view.setUploadedFiles(new ArrayList<>(uniqued.values()), installedPackages);
 
     view.setEnabled(true);
   }
