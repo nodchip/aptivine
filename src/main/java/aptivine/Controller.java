@@ -39,7 +39,7 @@ public class Controller {
 
   private static final String INDEX_URL_FORMAT = "http://u1.getuploader.com/irvn/index/%d/date/desc";
   private static final Pattern ROW_PATTERN = Pattern
-      .compile("<tr.+?><td><a href=\"(.+?)\" title=\".+?\">(.+?)</a></td><td>(.+?)</td><td>(.+?)</td><td>(.+?)</td><td>(.+?)</td><td>(.+?)</td><td><a class=\"button\" href=\".+?\" title=\"編集\">Edit</a></td></tr>");
+      .compile("<tr.*?><td><a href=\"(.+?)\" title=\".+?\">(.+?)</a></td><td>(.+?)</td><td>(.+?)</td><td>(.+?)</td><td>(.+?)</td><td>(.+?)</td><td><a class=\"button\" href=\".+?\" title=\"編集\">Edit</a></td></tr>");
   private static final Pattern TOKEN_PATTERN = Pattern
       .compile("<input type=\"hidden\" name=\"token\" value=\"(.+?)\" />");
   private static final Pattern DOWNLOAD_LINK_PATTERN = Pattern
@@ -63,10 +63,14 @@ public class Controller {
     view.setController(this);
 
     new Thread(() -> {
-      reload();
+      initialize();
     }).start();
 
     view.start();
+  }
+
+  private void initialize() {
+    reload();
   }
 
   public void reload() {
@@ -87,15 +91,16 @@ public class Controller {
 
     Map<String, Package> uniqued = new TreeMap<>();
     for (Package file : packages) {
-      if (uniqued.containsKey(file.getId())) {
-        Package existingPackage = uniqued.get(file.getId());
+      String id = file.getId();
+      if (uniqued.containsKey(id)) {
+        Package existingPackage = uniqued.get(id);
         double existingVersion = packageUtils.getVersionAsDouble(existingPackage.getFileName());
         double newVersion = packageUtils.getVersionAsDouble(file.getFileName());
         if (existingVersion > newVersion) {
           continue;
         }
       }
-      uniqued.put(file.getId(), file);
+      uniqued.put(id, file);
     }
     this.packages = uniqued;
 
