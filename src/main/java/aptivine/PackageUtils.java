@@ -23,7 +23,10 @@ public class PackageUtils {
   }
 
   public double getVersionAsDouble(String fileName) {
-    String version = getVersionAsString(fileName);
+    return toDouble(getVersionAsString(fileName));
+  }
+
+  public double toDouble(String version) {
     if (version == null) {
       return 0.0;
     }
@@ -42,8 +45,7 @@ public class PackageUtils {
     try {
       return Double.valueOf(version);
     } catch (NumberFormatException e) {
-      logger.log(Level.WARNING,
-          String.format("バージョン番号の書式が不正です: version=%s", fileName, getVersionAsString(fileName)), e);
+      logger.log(Level.WARNING, "バージョン番号の書式が不正です: version=" + version, e);
       return 0;
     }
   }

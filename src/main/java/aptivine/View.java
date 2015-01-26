@@ -2,6 +2,7 @@ package aptivine;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -28,11 +29,15 @@ import com.google.inject.Inject;
 
 public class View {
 
+  private static final int COLUMN_ID = 1;
+  private static final int COLUMN_INSTALLED_VERSION = 2;
+  private static final int COLUMN_LATEST_VERSION = 3;
+
   private final PackageUtils packageUtils;
   private Controller controller;
   private Shell shell;
   private Display display;
-  private Text textFolderPath;
+  private Text textIrvineFolderPath;
   private Button buttonSelectFolderPath;
   private Button buttonReload;
   private Button buttonMarkAllUpgrade;
@@ -62,12 +67,12 @@ public class View {
       }
 
       {
-        textFolderPath = new Text(composite2, SWT.SINGLE | SWT.BORDER);
+        textIrvineFolderPath = new Text(composite2, SWT.SINGLE | SWT.BORDER);
         GridData gridData = new GridData();
         gridData.horizontalAlignment = GridData.FILL;
         gridData.grabExcessHorizontalSpace = true;
-        textFolderPath.setLayoutData(gridData);
-        textFolderPath.setEnabled(false);
+        textIrvineFolderPath.setLayoutData(gridData);
+        textIrvineFolderPath.setEnabled(false);
       }
 
       {
@@ -126,8 +131,10 @@ public class View {
         buttonApply.addSelectionListener(new SelectionAdapter() {
           @Override
           public void widgetSelected(SelectionEvent e) {
+            String irvineFolderPath = getIrvineFolderPath();
+            List<String> markedPackageIds = getMarkedPackageIds();
             new Thread(() -> {
-              controller.apply();
+              controller.apply(irvineFolderPath, markedPackageIds);
             }).start();
           }
         });
@@ -268,6 +275,14 @@ public class View {
     });
   }
 
+  public void setProgress(int min, int max, int selection) {
+    checkAsyncExec(() -> {
+      progressBar.setMinimum(min);
+      progressBar.setMaximum(max);
+      progressBar.setSelection(selection);
+    });
+  }
+
   private boolean checkAsyncExec(Runnable r) {
     if (!display.isDisposed()) {
       display.asyncExec(r);
@@ -279,13 +294,51 @@ public class View {
 
   public void selectFolderPath() {
     DirectoryDialog dialog = new DirectoryDialog(shell);
-    String folderPath = textFolderPath.getText();
+    String folderPath = textIrvineFolderPath.getText();
     if (!Strings.isNullOrEmpty(folderPath)) {
       dialog.setFilterPath(folderPath);
     }
     folderPath = dialog.open();
     if (!Strings.isNullOrEmpty(folderPath)) {
-      textFolderPath.setText(folderPath);
+      textIrvineFolderPath.setText(folderPath);
     }
+  }
+
+  public void markAllUpgrade() {
+    checkAsyncExec(() -> {
+      int itemCount = table.getItemCount();
+      for (int itemIndex = 0; itemIndex < itemCount; ++itemIndex) {
+        TableItem item = table.getItem(itemIndex);
+        String installedVersion = item.getText(COLUMN_INSTALLED_VERSION);
+        if (Strings.isNullOrEmpty(installedVersion)) {
+          continue;
+        }
+
+        String latestVersion = item.getText(COLUMN_LATEST_VERSION);
+        if (packageUtils.toDouble(installedVersion) >= packageUtils.toDouble(latestVersion)) {
+          continue;
+        }
+
+        item.setChecked(true);
+      }
+    });
+  }
+
+  private List<String> getMarkedPackageIds() {
+    List<String> ids = new ArrayList<>();
+    int itemCount = table.getItemCount();
+    for (int itemIndex = 0; itemIndex < itemCount; ++itemIndex) {
+      TableItem item = table.getItem(itemIndex);
+      if (!item.getChecked()) {
+        continue;
+      }
+      String id = item.getText(COLUMN_ID);
+      ids.add(id);
+    }
+    return ids;
+  }
+
+  private String getIrvineFolderPath() {
+    return textIrvineFolderPath.getText();
   }
 }

@@ -2,9 +2,12 @@ package aptivine;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import java.io.ByteArrayOutputStream;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
@@ -16,15 +19,18 @@ import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.annotation.Nullable;
+
+import org.apache.commons.compress.archivers.ArchiveEntry;
+import org.apache.commons.compress.archivers.ArchiveException;
+import org.apache.commons.compress.archivers.ArchiveInputStream;
+import org.apache.commons.compress.archivers.ArchiveStreamFactory;
+
 import aptivine.database.Database;
 import aptivine.database.DatabaseException;
 
-import com.google.api.client.http.GenericUrl;
-import com.google.api.client.http.HttpRequest;
-import com.google.api.client.http.HttpRequestFactory;
-import com.google.api.client.http.HttpResponse;
-import com.google.api.client.http.HttpTransport;
-import com.google.common.base.Charsets;
+import com.google.common.io.ByteStreams;
+import com.google.common.io.Files;
 import com.google.inject.Inject;
 
 public class Controller {
@@ -34,20 +40,23 @@ public class Controller {
   private static final String INDEX_URL_FORMAT = "http://u1.getuploader.com/irvn/index/%d/date/desc";
   private static final Pattern ROW_PATTERN = Pattern
       .compile("<tr.+?><td><a href=\"(.+?)\" title=\".+?\">(.+?)</a></td><td>(.+?)</td><td>(.+?)</td><td>(.+?)</td><td>(.+?)</td><td>(.+?)</td><td><a class=\"button\" href=\".+?\" title=\"編集\">Edit</a></td></tr>");
+  private static final Pattern TOKEN_PATTERN = Pattern
+      .compile("<input type=\"hidden\" name=\"token\" value=\"(.+?)\" />");
+  private static final Pattern DOWNLOAD_LINK_PATTERN = Pattern
+      .compile("<a href=\"(.+?)\" title=\".+? を ダウンロード\">");
 
-  private final HttpTransport httpTransport;
   private final View view;
   private final Database database;
   private final PackageUtils packageUtils;
+  private final Downloader downloader;
   private Map<String, Package> packages;
 
   @Inject
-  public Controller(HttpTransport httpTransport, View view, Database database,
-      PackageUtils packageUtils) {
-    this.httpTransport = checkNotNull(httpTransport);
+  public Controller(View view, Database database, PackageUtils packageUtils, Downloader downloader) {
     this.view = checkNotNull(view);
     this.database = checkNotNull(database);
     this.packageUtils = checkNotNull(packageUtils);
+    this.downloader = checkNotNull(downloader);
   }
 
   public void start() {
@@ -63,6 +72,17 @@ public class Controller {
   public void reload() {
     view.setEnabled(false);
 
+    try {
+      doReload();
+    } catch (IOException e) {
+      view.setStatusBar("パッケージ情報の取得に失敗しました: " + e.getMessage());
+      logger.log(Level.WARNING, "パッケージ情報の取得に失敗しました", e);
+    }
+
+    view.setEnabled(true);
+  }
+
+  private void doReload() throws IOException {
     List<Package> packages = getUploadedFiles();
 
     Map<String, Package> uniqued = new TreeMap<>();
@@ -91,10 +111,9 @@ public class Controller {
 
     view.setUploadedFiles(new ArrayList<>(uniqued.values()), installedPackages);
 
-    view.setEnabled(true);
   }
 
-  private List<Package> getUploadedFiles() {
+  private List<Package> getUploadedFiles() throws IOException {
     List<Package> files = new ArrayList<>();
     for (int page = 1;; ++page) {
       view.setStatusBar(String.format("パッケージ情報を取得中です (%d)", page));
@@ -111,9 +130,9 @@ public class Controller {
     return files;
   }
 
-  private List<Package> getUploadedFiles(int page) {
+  private List<Package> getUploadedFiles(int page) throws IOException {
     String url = String.format(INDEX_URL_FORMAT, page);
-    String html = downloadAsString(url);
+    String html = downloader.downloadAsString(url);
     Matcher matcher = ROW_PATTERN.matcher(html);
     List<Package> files = new ArrayList<Package>();
     while (matcher.find()) {
@@ -142,59 +161,105 @@ public class Controller {
     return files;
   }
 
-  private String downloadAsString(String url) {
-    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-    int statusCode = download(url, outputStream);
-    logger.log(Level.INFO,
-        String.format("downloadAsString(): url=%s statusCode=%d", url, statusCode));
+  public void markAllUpgrade() {
+    view.markAllUpgrade();
+  }
 
-    if (statusCode / 100 != 2) {
+  public void apply(String irvineFolderPath, List<String> markedPackageIds) {
+    view.setEnabled(false);
+
+    try {
+      doApply(irvineFolderPath, markedPackageIds);
+    } catch (IOException | ArchiveException | DatabaseException e) {
+      view.setStatusBar("パッケージの更新に失敗しました: " + e.getMessage());
+      logger.log(Level.WARNING, "パッケージの更新に失敗しました", e);
+    }
+
+    view.setEnabled(true);
+  }
+
+  public void doApply(String irvineFolderPath, List<String> markedPackageIds) throws IOException,
+      ArchiveException, DatabaseException {
+    File outputDirectory = new File(irvineFolderPath);
+
+    int counter = 0;
+    for (String id : markedPackageIds) {
+      view.setProgress(0, markedPackageIds.size(), counter++);
+
+      // ファイルページの取得
+      Package p = packages.get(id);
+      String filePageUrl = p.getUrl();
+      view.setStatusBar("ファイルページを取得しています: filePageUrl=" + filePageUrl);
+      String filePageHtml = downloader.downloadAsString(filePageUrl);
+      String token = extractToken(filePageHtml);
+      if (token == null) {
+        throw new IOException("ダウンロードトークンが見つかりませんでした: filePageUrl=" + filePageUrl);
+      }
+
+      // ダウンロードページの取得
+      view.setStatusBar("ダウンロードページを取得しています: url=" + filePageUrl);
+      String downloadPagehtml = downloader.downloadAsString(filePageUrl, "token", token);
+
+      // パッケージの取得
+      String packageUrl = extractDownloadLink(downloadPagehtml);
+      if (packageUrl == null) {
+        throw new IOException("ダウンロードリンクが見つかりませんでした: filePageUrl=" + filePageUrl);
+      }
+      view.setStatusBar("パッケージを取得しています: packageUrl=" + packageUrl);
+      File file = File.createTempFile("aptivine", null);
+      downloader.downloadAsFile(packageUrl, file);
+
+      // パッケージの展開
+      view.setStatusBar("パッケージの展開中です: id=" + id);
+      try (BufferedInputStream packageInputStream = new BufferedInputStream(new FileInputStream(
+          file));
+          ArchiveInputStream archiveInputStream = new ArchiveStreamFactory()
+              .createArchiveInputStream(packageInputStream)) {
+        ArchiveEntry archiveEntry;
+        while ((archiveEntry = archiveInputStream.getNextEntry()) != null) {
+          if (archiveEntry.isDirectory()) {
+            continue;
+          }
+
+          // ファイルの展開
+          String name = archiveEntry.getName();
+          if (!name.contains("Dorothy2")) {
+            continue;
+          }
+          name = name.substring(name.indexOf("Dorothy2"));
+          view.setStatusBar("パッケージの展開中です: name=" + name);
+          File outputFile = new File(outputDirectory, name);
+          Files.createParentDirs(outputFile);
+          try (BufferedOutputStream fileOutputStream = new BufferedOutputStream(
+              new FileOutputStream(outputFile))) {
+            ByteStreams.copy(archiveInputStream, fileOutputStream);
+          }
+        }
+      }
+
+      // データベースの更新
+      database.saveInstalledPackage(p);
+    }
+
+    view.setStatusBar("アップデートが完了しました");
+    view.setProgress(0, markedPackageIds.size(), markedPackageIds.size());
+  }
+
+  @Nullable
+  private String extractToken(String html) {
+    Matcher matcher = TOKEN_PATTERN.matcher(html);
+    if (!matcher.find()) {
       return null;
     }
-
-    return new String(outputStream.toByteArray(), Charsets.UTF_8);
+    return matcher.group(1);
   }
 
-  private int download(String url, OutputStream outputStream) {
-    HttpRequestFactory requestFactory = httpTransport.createRequestFactory();
-    GenericUrl genericUrl = new GenericUrl(url);
-    HttpRequest request;
-    try {
-      request = requestFactory.buildGetRequest(genericUrl);
-    } catch (IOException e) {
-      logger.log(Level.WARNING, "ダウンロードに失敗しました: url=" + url, e);
-      return 0;
+  @Nullable
+  private String extractDownloadLink(String html) {
+    Matcher matcher = DOWNLOAD_LINK_PATTERN.matcher(html);
+    if (!matcher.find()) {
+      return null;
     }
-
-    HttpResponse response;
-    try {
-      response = request.execute();
-    } catch (IOException e) {
-      logger.log(Level.WARNING, "ダウンロードに失敗しました: url=" + url, e);
-      return 0;
-    }
-
-    if (response.getStatusCode() / 100 != 2) {
-      logger.log(Level.WARNING,
-          String.format("ダウンロードに失敗しました: url=%s statusCode=%d", url, response.getStatusCode()));
-      return response.getStatusCode();
-    }
-
-    try {
-      response.download(outputStream);
-    } catch (IOException e) {
-      logger.log(Level.WARNING, "ダウンロードに失敗しました: url=" + url, e);
-      return 0;
-    }
-
-    return response.getStatusCode();
-  }
-
-  public void markAllUpgrade() {
-
-  }
-
-  public void apply() {
-
+    return matcher.group(1);
   }
 }
