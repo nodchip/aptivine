@@ -1,22 +1,26 @@
 # aptivine
-aptivine �� Irvine Uploader �ɃA�b�v���[�h����Ă��� Irvine �����X�N���v�g���𔼎����I�Ƀ_�E�����[�h���邽�߂̃\�t�g�E�F�A�ł��B���p�ɂ� Java 8 ���K�v�ł��B
+aptivine は Irvine Uploader にアップロードされている Irvine 向けスクリプト等を半自動的にダウンロードするためのソフトウェアです。利用には Java 8 が必要です。
 
-# �C���X�g�[��
-1. https://java.com/ja/download/��� Java 8 ���_�E�����[�h���Ă��C���X�g�[�����Ă��������B
-2. Irvine Uploader http://u1.getuploader.com/irvn/ �ɃA�b�v���[�h����Ă��� aptivine.jar ��K���ȃt�H���_�ɉ𓀂��Ă��������B
+# 注意
+* 本ソフトウェアを使用する前にIrvineのフォルダのバックアップを取っておいてください。本ソフトウェアのバグによりスクリプトを破壊する可能性があります。
+* 本ソフトウェアはDorothy2フォルダの中のファイルのみを更新します。zipファイルの中にDorothy2フォルダがない場合、表示上は更新が成功したように見えますが、実際には更新されない場合があります。
 
-# �g�p���@
-1. aptivine.jar ���_�u���N���b�N����Ɖ�ʂ��o�Ă��܂��B
-2. ���΂炭�҂� Irvine Uploader ��̃t�@�C���ꗗ�̎擾���I���܂��B
-3. Irvine ���C���X�g�[�������t�H���_���w�肵�Ă��������B
-4. �C���X�g�[���������X�N���v�g (�p�b�P�[�W) �Ƀ`�F�b�N�����Ă��������B
-5. �u�K�p�v�{�^���������ƃX�N���v�g���_�E�����[�h�A�𓀂���܂��B
+# インストール
+1. https://java.com/ja/download/より Java 8 をダウンロードしてをインストールしてください。
+2. Irvine Uploader http://u1.getuploader.com/irvn/ にアップロードされている aptivine.jar を適当なフォルダに解凍してください。Dorothy2\binに解凍すると自分自身をアップデートできて便利です。
 
-# �J�����j
-�J���Ҏ��g�͋C�܂���ŊJ�����܂��B2ch �� Irvine �X���b�h�͎��X�����ǂ݂܂���̂ŁA�@�\�v�]��o�O�񍐂������Ă��قƂ�ǋC�Â��Ȃ��Ǝv���܂��B
-�l�ŐV�����@�\�̒ǉ���o�O�̏C���������ꍇ�́A���� Pull Request �����肢�������܂��B�ϋɓI�Ɏ󂯓���Ă��������Ǝv���܂��B
+# 使用方法
+1. aptivine.jar をダブルクリックすると画面が出てきます。
+2. しばらく待つと Irvine Uploader 上のファイル一覧の取得が終わります。
+3. Irvine をインストールしたフォルダを指定してください。
+4. インストールしたいスクリプト (パッケージ) にチェックを入れてください。
+5. 「適用」ボタンを押すとスクリプトがダウンロード、解凍されます。
 
-# �\�t�g�E�F�A�g�p����
-* �J���҂͖{�\�t�g�E�F�A�Ɋւ��Ă����Ȃ�ۏ؂��s���܂���B
-* �J���҂͖{�\�t�g�E�F�A�̎g�p�A�܂��͎g�p�s�\���琶���邢���Ȃ鑹�Q�Ɋւ��āA��ؐӔC�𕉂��܂���B���Ƃ��J���҂����̂悤�ȑ��Q�̉\���ɂ��Ēm�炳��Ă����ꍇ�����l�Ƃ��܂��B
-* �{�\�t�g�E�F�A�ɑ�O�҂��J�������\�t�g�E�F�A���܂܂�Ă���ꍇ�ɂ����Ă��A�J���҂ł����O�҂͂����Ȃ�ۏ؂��s���܂���B
+# 開発方針
+開発者自身は気まぐれで開発します。2ch の Irvine スレッドは時々しか読みませんので、機能要望やバグ報告があってもほとんど気づかないと思います。
+個人で新しい機能の追加やバグの修正をした場合は、ぜひ Pull Request をお願いいたします。積極的に受け入れていきたいと思います。
+
+# ソフトウェア使用条件
+* 開発者は本ソフトウェアに関していかなる保証も行いません。
+* 開発者は本ソフトウェアの使用、または使用不能から生じるいかなる損害に関して、一切責任を負いません。たとえ開発者がそのような損害の可能性について知らされていた場合も同様とします。
+* 本ソフトウェアに第三者が開発したソフトウェアが含まれている場合においても、開発者である第三者はいかなる保証も行いません。
