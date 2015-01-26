@@ -5,6 +5,7 @@ import java.util.Map;
 
 import org.apache.commons.dbutils.QueryRunner;
 import org.apache.commons.dbutils.handlers.BeanMapHandler;
+import org.apache.commons.dbutils.handlers.ScalarHandler;
 
 import aptivine.Package;
 
@@ -14,13 +15,6 @@ import com.google.inject.Inject;
 public class Database {
 
   private static final String ID = "id";
-  private static final String FILE_NAME = "fileName";
-  private static final String URL = "url";
-  private static final String FILE_SIZE = "fileSize";
-  private static final String COMMENT = "comment";
-  private static final String ORIGINAL = "original";
-  private static final String DOWNLOAD_COUNT = "downloadCount";
-  private static final String DATETIME = "datetime";
 
   private final QueryRunner queryRunner;
 
@@ -40,7 +34,11 @@ public class Database {
         + "  comment TEXT," //
         + "  original TEXT," //
         + "  downloadCount INTEGER," //
-        + "  datetime  TEXT" //
+        + "  datetime TEXT" //
+        + ");");
+    queryRunner.update("CREATE TABLE IF NOT EXISTS setting (" //
+        + "  key TEXT PRIMARY KEY," //
+        + "  value TEXT" //
         + ");");
   }
 
@@ -60,7 +58,23 @@ public class Database {
           + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)", p.getId(), p.getFileName(), p.getUrl(),
           p.getFileSize(), p.getComment(), p.getOriginal(), p.getDownloadCount(), p.getDatetime());
     } catch (SQLException e) {
-      throw new DatabaseException("インストール済みパッケージの読み込みに失敗しました", e);
+      throw new DatabaseException("インストール済みパッケージの保存に失敗しました", e);
+    }
+  }
+
+  public String loadSetting(String key) throws DatabaseException {
+    try {
+      return queryRunner.query("SELECT value FROM setting", new ScalarHandler<String>());
+    } catch (SQLException e) {
+      throw new DatabaseException("設定の読み込みに失敗しました", e);
+    }
+  }
+
+  public void saveSetting(String key, String value) throws DatabaseException {
+    try {
+      queryRunner.update("REPLACE INTO setting (key, value) VALUES (?, ?)", key, value);
+    } catch (SQLException e) {
+      throw new DatabaseException("設定の保存に失敗しました", e);
     }
   }
 }

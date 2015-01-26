@@ -178,6 +178,8 @@ public class View {
     gridData.grabExcessVerticalSpace = true;
     composite.setLayoutData(gridData);
     composite.pack();
+
+    shell.setSize(512, 512);
   }
 
   private void recreateTable() {
@@ -294,13 +296,17 @@ public class View {
 
   public void selectFolderPath() {
     DirectoryDialog dialog = new DirectoryDialog(shell);
-    String folderPath = textIrvineFolderPath.getText();
-    if (!Strings.isNullOrEmpty(folderPath)) {
-      dialog.setFilterPath(folderPath);
+    String currentFolderPath = textIrvineFolderPath.getText();
+    if (!Strings.isNullOrEmpty(currentFolderPath)) {
+      dialog.setFilterPath(currentFolderPath);
     }
-    folderPath = dialog.open();
-    if (!Strings.isNullOrEmpty(folderPath)) {
-      textIrvineFolderPath.setText(folderPath);
+    String newFolderPath = dialog.open();
+    if (!Strings.isNullOrEmpty(newFolderPath)) {
+      textIrvineFolderPath.setText(newFolderPath);
+      new Thread(() -> {
+        controller.onIrvineFolderPathSelected(newFolderPath);
+      }).start();
+      ;
     }
   }
 
@@ -340,5 +346,11 @@ public class View {
 
   private String getIrvineFolderPath() {
     return textIrvineFolderPath.getText();
+  }
+
+  public void setIrvineFolderPath(String irvineFolderPath) {
+    checkAsyncExec(() -> {
+      textIrvineFolderPath.setText(irvineFolderPath);
+    });
   }
 }

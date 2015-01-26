@@ -29,6 +29,8 @@ import org.apache.commons.compress.archivers.ArchiveStreamFactory;
 import aptivine.database.Database;
 import aptivine.database.DatabaseException;
 
+import com.google.common.base.Strings;
+import com.google.common.base.Throwables;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.Files;
 import com.google.inject.Inject;
@@ -44,6 +46,7 @@ public class Controller {
       .compile("<input type=\"hidden\" name=\"token\" value=\"(.+?)\" />");
   private static final Pattern DOWNLOAD_LINK_PATTERN = Pattern
       .compile("<a href=\"(.+?)\" title=\".+? を ダウンロード\">");
+  private static final String KEY_IRVINE_FOLDER_PATH = "irvineFolderPath";
 
   private final View view;
   private final Database database;
@@ -63,13 +66,25 @@ public class Controller {
     view.setController(this);
 
     new Thread(() -> {
-      initialize();
+      try {
+        initialize();
+      } catch (Exception e) {
+        logger.log(Level.SEVERE, "初期化に失敗しました", e);
+        throw Throwables.propagate(e);
+      }
     }).start();
 
     view.start();
   }
 
-  private void initialize() {
+  private void initialize() throws DatabaseException {
+    // Irvineフォルダの読み込み
+    String irvineFolderPath = database.loadSetting(KEY_IRVINE_FOLDER_PATH);
+    if (!Strings.isNullOrEmpty(irvineFolderPath)) {
+      view.setIrvineFolderPath(irvineFolderPath);
+    }
+
+    // パッケージ情報の取得
     reload();
   }
 
@@ -115,7 +130,6 @@ public class Controller {
     }
 
     view.setUploadedFiles(new ArrayList<>(uniqued.values()), installedPackages);
-
   }
 
   private List<Package> getUploadedFiles() throws IOException {
@@ -165,6 +179,14 @@ public class Controller {
 
     return files;
   }
+  
+  public void onIrvineFolderPathSelected(String irvineFolderPath){
+    try {
+      database.saveSetting(KEY_IRVINE_FOLDER_PATH, irvineFolderPath);
+    } catch (DatabaseException e) {
+      logger.log(Level.WARNING, "Irvineフォルダパスの保存に失敗しました",e); 
+    }
+  }
 
   public void markAllUpgrade() {
     view.markAllUpgrade();
@@ -175,6 +197,7 @@ public class Controller {
 
     try {
       doApply(irvineFolderPath, markedPackageIds);
+      doReload();
     } catch (IOException | ArchiveException | DatabaseException e) {
       view.setStatusBar("パッケージの更新に失敗しました: " + e.getMessage());
       logger.log(Level.WARNING, "パッケージの更新に失敗しました", e);
